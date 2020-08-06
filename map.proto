@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package github.com.jindezgm.gmap;
+option  go_package = "gmap";
+
+import "value.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.goproto_getters_all)      = false;
+option (gogoproto.goproto_sizecache_all)    = false;
+option (gogoproto.goproto_unkeyed_all)      = false;
+
+message Maps {
+    repeated ProtoValueMap  proto  = 1 [ (gogoproto.nullable) = false ];
+    repeated BytesValueMap  bytes  = 2 [ (gogoproto.nullable) = false ];
+    repeated StringValueMap string = 3 [ (gogoproto.nullable) = false ];
+    repeated NormalValueMap normal = 4 [ (gogoproto.nullable) = false ];
+}
+
+message ProtoValueMap {
+    string                            set  = 1;
+    string                            map  = 2;
+    map<string, RevisionedProtoValue> data = 3 [ (gogoproto.nullable) = false ];
+}
+
+message BytesValueMap {
+    string                            set  = 1;
+    string                            map  = 2;
+    map<string, RevisionedBytesValue> data = 3 [ (gogoproto.nullable) = false ];
+}
+
+message StringValueMap {
+    string                             set  = 1;
+    string                             map  = 2;
+    map<string, RevisionedStringValue> data = 3 [ (gogoproto.nullable) = false ];
+}
+
+message NormalValueMap {
+    string set  = 1;
+    string map  = 2;
+    bytes  data = 3;
+}

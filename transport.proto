@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package github.com.jindezgm.gmap;
+option  go_package = "gmap";
+
+import "proto_value.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.goproto_getters_all)      = false;
+option (gogoproto.goproto_sizecache_all)    = false;
+option (gogoproto.goproto_unkeyed_all)      = false;
+
+service TransportService {
+    rpc SendMessage(stream Bytes) returns (Empty);
+    rpc SendSnapshot(Bytes) returns (Empty);
+}
+
+message Empty {}
+message Bytes { bytes data = 1; }
+
+message SetMapKey {
+    string set = 1;
+    string map = 2;
+    string key = 3;
+}
+
+message PutRequest {
+    SetMapKey  setMapKey = 1 [ (gogoproto.embed) = true, (gogoproto.nullable) = false ];
+    ProtoValue value     = 2;
+}
+
+message DeleteRequest { SetMapKey setMapKey = 1 [ (gogoproto.embed) = true, (gogoproto.nullable) = false ]; }
+
+message UpdateRequest {
+    SetMapKey  setMapKey = 1 [ (gogoproto.embed) = true, (gogoproto.nullable) = false ];
+    uint64     revision  = 2;
+    ProtoValue value     = 3;
+}
+
+message InternalRaftRequest {
+    uint64     id        = 1 [ (gogoproto.customname) = "ID" ];
+    PutRequest put       = 2;
+    DeleteRequest delete = 3;
+    UpdateRequest update = 4;
+}

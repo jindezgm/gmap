@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package github.com.jindezgm.gmap;
+option  go_package = "gmap";
+
+import "proto_value.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.goproto_getters_all)      = false;
+option (gogoproto.goproto_sizecache_all)    = false;
+option (gogoproto.goproto_unkeyed_all)      = false;
+
+message RevisionedProtoValue {
+    option (gogoproto.typedecl) = false;
+    uint64     revision         = 1;
+    ProtoValue value            = 2;
+}
+
+message RevisionedStringValue {
+    uint64 revision = 1;
+    string value    = 2;
+}
+
+message RevisionedBytesValue {
+    uint64 revision = 1;
+    bytes  value    = 2;
+}
+
+message StringValue { string value = 1; }
+
+message BytesValue { bytes value = 1; }
