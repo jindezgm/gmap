@@ -69,7 +69,7 @@ func New(ctx context.Context, endpoints []string, id int, values ...interface{})
 	// Set default context if not specific.
 	if nil == ctx {
 		ctx = context.Background()
-		logger.Info("use background context because conext is not specified")
+		logger.Info("use background context because context is not specified")
 	}
 
 	// Create gmap object.
@@ -155,7 +155,7 @@ func (gm *gmap) applyAll(gmp *gmapProgress, apply *apply) {
 	gm.applySnapshot(gmp, apply)
 	// Apply entries.
 	gm.applyEntries(gmp, apply)
-	// Wait for the raft routine to finish the disk writes before griggering a snapshot.
+	// Wait for the raft routine to finish the disk writes before triggering a snapshot.
 	// or applied index might be greater than the last index in raft storage.
 	// since the raft routine might be slower than apply routine.
 	<-apply.notifyc
@@ -172,6 +172,10 @@ func (gm *gmap) applySnapshot(gmp *gmapProgress, apply *apply) {
 	// Write apply snapshot log.
 	logger.Infof("applying snapshot at index %d...", gmp.snapi)
 	defer func() { logger.Infof("finished applying incoming snapshot at index %d", gmp.snapi) }()
+	// If the index of snapshot is smaller than the currently applied index, maybe raft is fault.
+	if apply.snapshot.Metadata.Index < gmp.appliedi {
+		logger.Panicf("snapshot index [%d] should > applied index[%d] + 1", apply.snapshot.Metadata.Index, gmp.appliedi)
+	}
 	// Because gmap does not need to be persistent, don't need wait for raftNode to persist snapshot into the disk.
 	// <-apply.notifyc
 	// Load storage data from snapshot.
@@ -205,7 +209,7 @@ func (gm *gmap) applyEntries(gmp *gmapProgress, apply *apply) {
 		// Normal entry.
 		case raftpb.EntryNormal:
 			if len(e.Data) != 0 {
-				// Unmrashal request.
+				// Unmarshal request.
 				var req InternalRaftRequest
 				pbutil.MustUnmarshal(&req, e.Data)
 
@@ -302,12 +306,15 @@ func (gm *gmap) snapshot(snapi uint64, confState raftpb.ConfState) {
 		}
 		logger.Panicf("unexpected create snapshot error %v", err)
 	}
-	// Check inflight snapshot.
+	// When sending a snapshot, gmap will pause compaction. After receives a snapshot, the slow follower needs
+	// to get all the entries right after the snapshot sent to catch up. If we do not pause compaction, the
+	// log entries right after the snapshot sent might already be compacted. It happens when the snapshot
+	// take long to send and save. Pausing compaction avoids triggering a snapshot sending cycle.
 	if atomic.LoadInt64(&gm.inflightSnapshots) != 0 {
 		logger.Infof("skip compaction since there is an inflight snapshot")
 		return
 	}
-	// Skip some in memory log entries for slow follower
+	// Keep some in memory log entries for slow followers
 	compacti := uint64(1)
 	if snapi > defaultSnapshotCatchUpEntries {
 		compacti = snapi - defaultSnapshotCatchUpEntries
@@ -317,7 +324,7 @@ func (gm *gmap) snapshot(snapi uint64, confState raftpb.ConfState) {
 		if err == raft.ErrCompacted {
 			return
 		}
-		logger.Panicf("unexpect compaction error %v", err)
+		logger.Panicf("unexpected compaction error %v", err)
 	}
 
 	logger.Infof("compacted raft log at %d", compacti)

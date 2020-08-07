@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Logger define log interface.
 type Logger interface {
 	Debug(v ...interface{})
 	Debugf(format string, v ...interface{})
@@ -37,6 +38,7 @@ type Logger interface {
 
 var logger Logger
 
+// init create default logger.
 func init() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if nil != err {
@@ -58,36 +60,37 @@ func (l *zapLogger) Warningf(format string, v ...interface{}) {
 	l.Warnf(format, v)
 }
 
+// NewLogger create logger.
 func NewLogger(path string) Logger {
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoder := zapcore.NewConsoleEncoder(config)
-
+	// Create file writer.
 	file := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   path,
-		MaxSize:    1024,
-		MaxBackups: 7,
-		MaxAge:     7,
+		Filename:   path, // Log file path.
+		MaxSize:    1024, // 1G
+		MaxBackups: 7,    // 7 files.
+		MaxAge:     7,    // 7 days
 	})
-
+	// Create stdio writer.
 	stdout := zapcore.AddSync(os.Stdout)
-
+	// Create logger core.
 	core := zapcore.NewTee(
 		zapcore.NewCore(encoder, file, zap.InfoLevel),
 		zapcore.NewCore(encoder, stdout, zap.DebugLevel),
 	)
-
+	// Create logger.
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.PanicLevel))
-
 	return &zapLogger{SugaredLogger: logger.Sugar()}
 }
 
-//
+// GetLogger get gmap logger. If don't implement logger can reuse gmap's logger,
+// for example, examples program or test program, gmap uses zap to implement logger.
 func GetLogger() Logger {
 	return logger
 }
 
-//
+// SetLogger set user logger.
 func SetLogger(l Logger) {
 	logger = l
 }

@@ -25,7 +25,7 @@ type transport struct {
 	ctx    context.Context    // Transport context.
 	cancel context.CancelFunc // Transport cancel function
 	gmap   *gmap              // gmap pointer
-	server *grpc.Server       //GRPC server
+	server *grpc.Server       // GRPC server
 	peers  []peer             // Peers, other gmap node.
 }
 
@@ -55,7 +55,7 @@ func newTransport(gm *gmap, endpoints []string) *transport {
 			// Listen specific port
 			listener, err := net.Listen("tcp4", "0.0.0.0:"+items[1])
 			if nil != err {
-				logger.Panic("listen on the port(%s) failed:%v", items[1], err)
+				logger.Panicf("listen on the port(%s) failed:%v", items[1], err)
 			}
 			// Run the transport GRPC service
 			RegisterTransportServiceServer(t.server, t)
@@ -84,7 +84,7 @@ func (t *transport) send(msgs []raftpb.Message) {
 			select {
 			// Send message to peer.
 			case t.peers[to].msgc <- msg:
-			// Transport s closed.
+			// Transport is closed.
 			case <-t.ctx.Done():
 			// t.peers[to].msgc is full.
 			default:
@@ -128,7 +128,7 @@ func (t *transport) stop() {
 	// Stop peers.
 	for i := range t.peers {
 		if i != int(t.gmap.id-1) {
-			// Send stop signal and waiting fro exit.
+			// Send stop signal and waiting for exit.
 			close(t.peers[i].msgc)
 			<-t.peers[i].done
 		}
@@ -175,7 +175,7 @@ func (p *peer) run() {
 				continue
 			}
 		}
-		// Snapshot should be sent by creating a coroutine, because the snapshot may be very large,
+		// Snapshot上 should be sent by creating a coroutine, because the snapshot may be very large,
 		// and the sending time will be vary long, even affect heartbeat sending.
 		if msg.Type == raftpb.MsgSnap {
 			go func() {

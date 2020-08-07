@@ -24,7 +24,7 @@ type typedMap struct {
 	watchers sync.Map                   // Watchers
 }
 
-// typedMap impelement Map interfaces.
+// typedMap implement Map interfaces.
 var _ Map = &typedMap{}
 
 // newTypedMap create typedMap.
@@ -215,7 +215,7 @@ func (m *typedMap) newUpdateProposal(key string, value interface{}, revision, id
 // addToMaps add typed map to maps.
 func (m *typedMap) addToMaps(ms *Maps) {
 	m.mutex.RLock()
-	defer m.mutex.Unlock()
+	defer m.mutex.RUnlock()
 
 	switch {
 	// Protobufable value object.

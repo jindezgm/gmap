@@ -17,10 +17,15 @@ import (
 )
 
 var (
-	maxSizePerMsg   uint64 = 1 * 1024 * 1024
-	maxInflightMsgs int    = 4096 / 8
-	tickMs                 = 500
-	electionMs             = 2000
+	// The max throughput of gmap will not exceed 100MB/s (100K * 1KB values).
+	// Assuming the RTT is around 10ms, 1MB max size is large enought.
+	maxSizePerMsg uint64 = 1 * 1024 * 1024
+	// Never overflow the GRPC buffer, which is 4096
+	maxInflightMsgs int = 4096 / 8
+	// Time time in miliseconds.
+	tickMs = 500
+	// Election time in milliseconds.
+	electionMs = 2000
 )
 
 // raftNode is gmap raft node, processing ready data of raft
@@ -115,9 +120,9 @@ func (r *raftNode) run() {
 			case <-r.stopped:
 				return
 			}
-			// The leader can write ot its disk in parallel with replicating to the follower and them writing to their disks.
+			// The leader can write to its disk in parallel with replicating to the follower and them writing to their disks.
 			if islead {
-				r.transport.send(r.processMessage(rd.Messages))
+				r.transport.send(r.processMessages(rd.Messages))
 			}
 			// Process snapshot.
 			if !raft.IsEmptySnap(rd.Snapshot) {
@@ -126,13 +131,14 @@ func (r *raftNode) run() {
 
 				// Write snapshot into raft storage.
 				r.gmap.raftStorage.ApplySnapshot(rd.Snapshot)
-				logger.Infof("raft applied incomming snapshot at index %d", rd.Snapshot.Metadata.Index)
+				logger.Infof("raft applied incoming snapshot at index %d", rd.Snapshot.Metadata.Index)
 			}
 			// Write entries into raft storage.
 			r.gmap.raftStorage.Append(rd.Entries)
 
 			if !islead {
-				ms := r.processMessage(rd.Messages)
+				// finish processing incoming messages before we signal raft done chan
+				ms := r.processMessages(rd.Messages)
 				// Now unblocks 'applyAll' that waits on raft log disk writes before triggering snapshot.
 				notifyc <- struct{}{}
 				r.transport.send(ms)
@@ -148,16 +154,16 @@ func (r *raftNode) run() {
 	}
 }
 
-// processMessage preprocess some message.
-func (r *raftNode) processMessage(ms []raftpb.Message) []raftpb.Message {
-	sendAppResp := false
+// processMessages preprocess some message.
+func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
+	sentAppResp := false
 	for i := len(ms) - 1; i >= 0; i-- {
 		// The response to the apply message only need to send the applied largest index.
 		if ms[i].Type == raftpb.MsgAppResp {
-			if sendAppResp {
+			if sentAppResp {
 				ms[i].To = 0 // ID=0 mean don't send this message.
 			} else {
-				sendAppResp = true
+				sentAppResp = true
 			}
 		}
 		// Add inflight snapshot count if snapshot message
