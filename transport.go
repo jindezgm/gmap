@@ -175,8 +175,8 @@ func (p *peer) run() {
 				continue
 			}
 		}
-		// Snapshot上 should be sent by creating a coroutine, because the snapshot may be very large,
-		// and the sending time will be vary long, even affect heartbeat sending.
+		// Snapshots should be sent by creating a coroutine, because the snapshot may be very large,
+		// and the sending time will be very long, even affect heartbeat sending.
 		if msg.Type == raftpb.MsgSnap {
 			go func() {
 				// Compress the sent snapshot with gzip.

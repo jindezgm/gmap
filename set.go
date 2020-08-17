@@ -9,6 +9,7 @@ package gmap
 import (
 	"reflect"
 	"sync"
+	"unsafe"
 )
 
 // set is a collection of maps of the same value type
@@ -69,15 +70,12 @@ func (ss *sets) load(data []byte) error {
 		if !exist {
 			logger.Panicf("set is not exist:%s", maps.Proto[i].Set)
 		}
-		// Get map.
-		m := set.get(maps.Proto[i].Map)
-		// Convert ProtoValueMap to map[string]revisionedValue
-		m.mutex.Lock()
-		m.data = make(map[string]revisionedValue, len(maps.Proto[i].Data))
+		// Convert ProtoValueMap to map[string]*entry
+		data := make(map[string]*entry, len(maps.Proto[i].Data))
 		for k, v := range maps.Proto[i].Data {
-			m.data[k] = revisionedValue{Revision: v.Revision, Value: v.Value}
+			data[k] = &entry{p: unsafe.Pointer(&revisionedValue{Revision: v.Revision, Value: v.Value})}
 		}
-		m.mutex.Unlock()
+		set.get(maps.Proto[i].Map).copy(data)
 	}
 	// Restore string value map.
 	for i := range maps.String_ {
@@ -86,15 +84,12 @@ func (ss *sets) load(data []byte) error {
 		if !exist {
 			logger.Panicf("set is not exist:%s", maps.String_[i].Set)
 		}
-		// Get map.
-		m := set.get(maps.String_[i].Map)
-		// Convert StringValueMap to map[string]revisionedValue
-		m.mutex.Lock()
-		m.data = make(map[string]revisionedValue, len(maps.String_[i].Data))
+		// Convert StringValueMap to map[string]*entry
+		data := make(map[string]*entry, len(maps.String_[i].Data))
 		for k, v := range maps.String_[i].Data {
-			m.data[k] = revisionedValue{Revision: v.Revision, Value: v.Value}
+			data[k] = &entry{p: unsafe.Pointer(&revisionedValue{Revision: v.Revision, Value: v.Value})}
 		}
-		m.mutex.Unlock()
+		set.get(maps.String_[i].Map).copy(data)
 	}
 	// Restore bytes value map.
 	for i := range maps.Bytes {
@@ -103,15 +98,12 @@ func (ss *sets) load(data []byte) error {
 		if !exist {
 			logger.Panicf("set is not exist:%s", maps.Bytes[i].Set)
 		}
-		// Get map.
-		m := set.get(maps.Bytes[i].Map)
-		// Convert BytesValueMap to map[string]revisionedValue
-		m.mutex.Lock()
-		m.data = make(map[string]revisionedValue, len(maps.Bytes[i].Data))
+		// Convert BytesValueMap to map[string]*entry
+		data := make(map[string]*entry, len(maps.Bytes[i].Data))
 		for k, v := range maps.Bytes[i].Data {
-			m.data[k] = revisionedValue{Revision: v.Revision, Value: v.Value}
+			data[k] = &entry{p: unsafe.Pointer(&revisionedValue{Revision: v.Revision, Value: v.Value})}
 		}
-		m.mutex.Unlock()
+		set.get(maps.Bytes[i].Map).copy(data)
 	}
 	// Restore normal value map.
 	for i := range maps.Normal {
@@ -126,14 +118,15 @@ func (ss *sets) load(data []byte) error {
 		o := reflect.New(reflect.MapOf(reflect.TypeOf(""), buildRevisionedValueType(m.vtype.vtype)))
 		// Unmarshal map[string]interface{}
 		mustUnmarshal(maps.Normal[i].Data, o.Interface())
-		// Convert map[string]struct{uint64,m.vtype.vtype} to map[string]revisionedValue
-		m.mutex.Lock()
-		m.data = make(map[string]revisionedValue, o.Elem().Len())
-		i := o.Elem().MapRange()
-		for i.Next() {
-			m.data[i.Key().String()] = revisionedValue{Revision: i.Value().Field(0).Uint(), Value: i.Value().Field(1).Interface()}
+		// Convert map[string]struct{uint64,m.vtype.vtype} to map[string]*entry
+		data := make(map[string]*entry, o.Elem().Len())
+		j := o.Elem().MapRange()
+		for j.Next() {
+			data[j.Key().String()] = &entry{p: unsafe.Pointer(&revisionedValue{Revision: j.Value().Field(0).Uint(),
+				Value: j.Value().Field(1).Interface()})}
 		}
-		m.mutex.Unlock()
+		set.get(maps.Normal[i].Map).copy(data)
+
 	}
 
 	return nil

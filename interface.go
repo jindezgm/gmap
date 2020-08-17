@@ -60,11 +60,12 @@ type Map interface {
 	Put(key string, value interface{}) error
 	// Delete teh value for a key and return previous value.
 	Delete(key string) (interface{}, error)
-	// Range call back the value of key in the range [begin, end)
-	Range(begin, end string, f func(key string, value interface{}) bool)
+	// Range calls f sequentially for each key and value present in the map.
+	// If f returns false, range stops the iteration.
+	Range(f func(key string, value interface{}) bool)
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' retrying the update
 	// util success if there is revision conflict.
-	GuaranteedUpdate(key string, ignoredNotFound bool, tryUpdate TryUpdateFunc) error
+	GuaranteedUpdate(key string, tryUpdate TryUpdateFunc) error
 	// Watch watches on the map, the watched events will be returned through the watcher channel.
 	Watch() Watcher
 }

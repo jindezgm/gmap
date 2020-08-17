@@ -244,8 +244,9 @@ func (gm *gmap) applyEntries(gmp *gmapProgress, apply *apply) {
 					}
 					// Get map and delete value from map.
 					m := set.get(del.Map)
-					if ar.pre = m.delete(del.Key); ar.pre.Revision != 0 {
+					if pre := m.delete(del.Key); nil != pre {
 						// Send put event to watcher
+						ar.pre = *pre
 						event := MapEvent{Type: DELETE, PrevKV: &KeyValue{Key: del.Key, Value: ar.pre.Value}}
 						m.watchers.Range(func(key, value interface{}) bool {
 							key.(*watcher).eventc <- event
@@ -263,10 +264,13 @@ func (gm *gmap) applyEntries(gmp *gmapProgress, apply *apply) {
 					// Get map.
 					m := set.get(update.Map)
 					// Update value.
-					var ok bool
-					if ar.pre, ok = m.update(update.Key, update.Value, update.Revision, e.Index); ok {
+					pre, ok := m.update(update.Key, update.Value, update.Revision, e.Index)
+					if ok {
 						// The revision will be set only if update succeed
 						ar.rev = e.Index
+					}
+					if nil != pre {
+						ar.pre = *pre
 					}
 				}
 				// Trigger proposal waiter.
